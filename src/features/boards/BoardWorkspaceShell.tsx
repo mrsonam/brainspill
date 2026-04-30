@@ -200,8 +200,8 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
   }, [addImageFile]);
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f7f5ef] text-foreground">
-      <header className="z-10 flex h-14 items-center justify-between border-b border-black/10 bg-background/90 px-4 backdrop-blur">
+    <main className="flex h-screen overflow-hidden flex-col bg-[#f7f5ef] text-foreground">
+      <header className="z-40 flex h-14 shrink-0 items-center justify-between border-b border-black/10 bg-background/90 px-4 backdrop-blur">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon" aria-label="Back to boards">
             <Link href="/boards">
@@ -218,12 +218,12 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
         <div className="text-xs text-muted-foreground">Single-user prototype</div>
       </header>
 
-      <section className="relative flex flex-1 overflow-hidden">
+      <section className="isolate relative flex min-h-0 flex-1 overflow-hidden">
         <aside
           aria-label="Canvas tools"
           role="toolbar"
           aria-orientation="vertical"
-          className="absolute left-4 top-4 z-10 flex flex-col gap-2 rounded-2xl border border-black/10 bg-background/90 p-2 shadow-sm backdrop-blur"
+          className="absolute left-4 top-4 z-30 flex flex-col gap-2 rounded-2xl border border-black/10 bg-background/90 p-2 shadow-sm backdrop-blur"
         >
           {tools.map((tool) => {
             const Icon = tool.icon;

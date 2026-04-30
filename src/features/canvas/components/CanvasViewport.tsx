@@ -20,6 +20,7 @@ type CanvasViewportProps = {
 };
 
 export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
+  const viewportElementRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const scene = useLocalScene(boardId);
@@ -77,9 +78,29 @@ export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
     };
   }, [boardId, resetViewport, scene.selectedObjectIds]);
 
+  useEffect(() => {
+    const viewportElement = viewportElementRef.current;
+
+    if (!viewportElement) {
+      return;
+    }
+
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault();
+      zoomAt({ x: event.clientX, y: event.clientY }, event.deltaY);
+    }
+
+    viewportElement.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      viewportElement.removeEventListener("wheel", handleWheel);
+    };
+  }, [zoomAt]);
+
   return (
     <div
-      className="relative flex flex-1 touch-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      ref={viewportElementRef}
+      className="relative z-0 flex min-h-0 flex-1 touch-none overflow-hidden overscroll-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
       role="region"
       aria-label="Brainspill canvas. Drag to pan, scroll to zoom, and use the toolbar to add objects."
       tabIndex={0}
@@ -107,10 +128,6 @@ export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
         endPan();
       }}
       onPointerCancel={endPan}
-      onWheel={(event) => {
-        event.preventDefault();
-        zoomAt({ x: event.clientX, y: event.clientY }, event.deltaY);
-      }}
     >
       {gridVisible ? <GridLayer gridRef={gridRef} /> : null}
 
