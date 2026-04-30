@@ -51,11 +51,22 @@ export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
         return;
       }
 
+      if (event.key === "Escape") {
+        selectLocalObjects(boardId, []);
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
         event.preventDefault();
         scene.selectedObjectIds.forEach((objectId) => {
           duplicateLocalObject(boardId, objectId);
         });
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "0") {
+        event.preventDefault();
+        resetViewport();
       }
     }
 
@@ -64,11 +75,14 @@ export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [boardId, scene.selectedObjectIds]);
+  }, [boardId, resetViewport, scene.selectedObjectIds]);
 
   return (
     <div
-      className="relative flex flex-1 touch-none overflow-hidden"
+      className="relative flex flex-1 touch-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      role="region"
+      aria-label="Brainspill canvas. Drag to pan, scroll to zoom, and use the toolbar to add objects."
+      tabIndex={0}
       onPointerDown={(event) => {
         if (event.button !== 0) {
           return;
@@ -132,6 +146,16 @@ export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
         <Button variant="outline" size="sm" onClick={resetViewport}>
           Reset
         </Button>
+      </div>
+
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-2xl border border-black/10 bg-background/80 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+        <span>Delete</span>
+        <span className="mx-2 text-border">/</span>
+        <span>Esc</span>
+        <span className="mx-2 text-border">/</span>
+        <span>Ctrl+D</span>
+        <span className="mx-2 text-border">/</span>
+        <span>Ctrl+0</span>
       </div>
     </div>
   );

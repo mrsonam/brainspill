@@ -8,9 +8,22 @@ import {
   MousePointer2,
   StickyNote,
 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CanvasViewport } from "@/features/canvas/components/CanvasViewport";
 import {
   createLocalImage,
@@ -27,10 +40,18 @@ type BoardWorkspaceShellProps = {
 };
 
 const tools = [
-  { label: "Select", icon: MousePointer2 },
-  { label: "Note", icon: StickyNote },
-  { label: "Image", icon: ImageIcon },
-  { label: "Grid", icon: Grid3X3 },
+  {
+    label: "Select",
+    description: "Clear selection and pan the board",
+    icon: MousePointer2,
+  },
+  { label: "Note", description: "Add a sticky note", icon: StickyNote },
+  {
+    label: "Image",
+    description: "Add an image from your device",
+    icon: ImageIcon,
+  },
+  { label: "Grid", description: "Toggle the canvas grid", icon: Grid3X3 },
 ];
 
 function titleFromBoardId(boardId: string) {
@@ -89,28 +110,31 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
   const title =
     boards.find((board) => board.id === boardId)?.title ?? fallbackTitle;
 
-  async function addImageFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
+  const addImageFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        return;
+      }
 
-    const src = await imageFileToDataUrl(file);
-    const dimensions = await readImageDimensions(src);
-    const maxWidth = 360;
-    const scale = Math.min(1, maxWidth / dimensions.width);
+      const src = await imageFileToDataUrl(file);
+      const dimensions = await readImageDimensions(src);
+      const maxWidth = 360;
+      const scale = Math.min(1, maxWidth / dimensions.width);
 
-    createLocalImage(boardId, {
-      x: 360,
-      y: 96,
-      src,
-      fileName: file.name,
-      mimeType: file.type,
-      naturalWidth: dimensions.width,
-      naturalHeight: dimensions.height,
-      width: Math.round(dimensions.width * scale),
-      height: Math.round(dimensions.height * scale),
-    });
-  }
+      createLocalImage(boardId, {
+        x: 360,
+        y: 96,
+        src,
+        fileName: file.name,
+        mimeType: file.type,
+        naturalWidth: dimensions.width,
+        naturalHeight: dimensions.height,
+        width: Math.round(dimensions.width * scale),
+        height: Math.round(dimensions.height * scale),
+      });
+    },
+    [boardId],
+  );
 
   function handleImageInputChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -173,7 +197,7 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
     return () => {
       window.removeEventListener("paste", handlePaste);
     };
-  });
+  }, [addImageFile]);
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f5ef] text-foreground">
@@ -197,22 +221,36 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
       <section className="relative flex flex-1 overflow-hidden">
         <aside
           aria-label="Canvas tools"
+          role="toolbar"
+          aria-orientation="vertical"
           className="absolute left-4 top-4 z-10 flex flex-col gap-2 rounded-2xl border border-black/10 bg-background/90 p-2 shadow-sm backdrop-blur"
         >
           {tools.map((tool) => {
             const Icon = tool.icon;
+            const pressed =
+              tool.label === "Select" ||
+              (tool.label === "Grid" && gridVisible);
 
             return (
-              <Button
-                key={tool.label}
-                variant={tool.label === "Select" ? "default" : "ghost"}
-                size="icon"
-                aria-label={tool.label}
-                aria-pressed={tool.label === "Grid" ? gridVisible : undefined}
-                onClick={() => handleToolClick(tool.label)}
-              >
-                <Icon />
-              </Button>
+              <Tooltip key={tool.label}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={pressed ? "default" : "ghost"}
+                    size="icon"
+                    aria-label={tool.description}
+                    aria-pressed={
+                      tool.label === "Grid" ? gridVisible : undefined
+                    }
+                    onClick={() => handleToolClick(tool.label)}
+                  >
+                    <Icon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <span>{tool.label}</span>
+                  <span className="text-background/70">{tool.description}</span>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </aside>
