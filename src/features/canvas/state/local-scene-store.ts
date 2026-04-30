@@ -36,6 +36,8 @@ type CreateImageOptions = CanvasPoint & {
   mimeType?: string;
   naturalWidth?: number;
   naturalHeight?: number;
+  width?: number;
+  height?: number;
 };
 
 const sceneSnapshots = new Map<string, CanvasScene>();
