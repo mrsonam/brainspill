@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CanvasViewport } from "@/features/canvas/components/CanvasViewport";
+import { CloudBoardSceneSync } from "@/features/canvas/sync/cloud-board-scene-sync";
 import {
   createLocalImage,
   createLocalStickyNote,
@@ -314,6 +315,8 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
           className="hidden"
           onChange={handleImageInputChange}
         />
+
+        <CloudBoardSceneSync boardId={boardId} enabled={fetchCloudBoard} />
 
         <CanvasViewport boardId={boardId} gridVisible={gridVisible} />
       </section>

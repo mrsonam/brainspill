@@ -63,4 +63,13 @@ export default defineSchema({
   })
     .index("by_boardId_and_createdAt", ["boardId", "createdAt"])
     .index("by_createdBy", ["createdBy"]),
+
+  /** Latest serialized canvas scene per board (blob in file storage). */
+  boardScenes: defineTable({
+    boardId: v.id("boards"),
+    storageId: v.id("_storage"),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+    byteSize: v.number(),
+  }).index("by_boardId", ["boardId"]),
 });

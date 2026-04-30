@@ -61,6 +61,19 @@ function emitSceneChange(boardId: string) {
   sceneListeners.get(boardId)?.forEach((listener) => listener());
 }
 
+export function replaceLocalScene(boardId: string, scene: CanvasScene) {
+  const normalized: CanvasScene = {
+    ...scene,
+    boardId,
+    selectedObjectIds: [],
+  };
+
+  sceneSnapshots.set(boardId, normalized);
+  emitSceneChange(boardId);
+
+  return normalized;
+}
+
 function updateScene(
   boardId: string,
   updater: (scene: CanvasScene) => CanvasScene,
