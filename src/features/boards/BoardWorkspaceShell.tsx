@@ -11,6 +11,7 @@ import {
 import { useMemo, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CanvasViewport } from "@/features/canvas/components/CanvasViewport";
 import {
   getLocalBoardsSnapshot,
   getServerLocalBoardsSnapshot,
@@ -60,7 +61,7 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
           <div>
             <p className="text-sm font-medium leading-none">{title}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Local board shell · canvas runtime next
+              Pan and zoom runtime · object rendering next
             </p>
           </div>
         </div>
@@ -88,22 +89,7 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
           })}
         </aside>
 
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.06)_1px,transparent_1px)] bg-[size:48px_48px]" />
-
-        <div className="relative flex flex-1 items-center justify-center">
-          <div className="max-w-sm rounded-3xl border border-black/10 bg-background/90 p-6 text-center shadow-sm backdrop-blur">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              Canvas placeholder
-            </p>
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-              Paste an image, write a note, or turn on grid.
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Board records now persist locally. Phase 4 starts the actual pan,
-              zoom, grid, and object runtime.
-            </p>
-          </div>
-        </div>
+        <CanvasViewport boardId={boardId} />
       </section>
     </main>
   );
