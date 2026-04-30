@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -34,6 +36,9 @@ import {
   getServerLocalBoardsSnapshot,
   subscribeLocalBoards,
 } from "@/features/boards/local-board-store";
+import { isLocalPrototypeBoardId } from "@/lib/board-id";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type BoardWorkspaceShellProps = {
   boardId: string;
@@ -101,14 +106,57 @@ function readImageDimensions(src: string) {
 export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [gridVisible, setGridVisible] = useState(true);
+  const { isLoaded, isSignedIn } = useAuth();
   const fallbackTitle = useMemo(() => titleFromBoardId(boardId), [boardId]);
   const boards = useSyncExternalStore(
     subscribeLocalBoards,
     getLocalBoardsSnapshot,
     getServerLocalBoardsSnapshot,
   );
-  const title =
-    boards.find((board) => board.id === boardId)?.title ?? fallbackTitle;
+  const fetchCloudBoard =
+    isLoaded &&
+    isSignedIn &&
+    !isLocalPrototypeBoardId(boardId);
+  const cloudBoard = useQuery(
+    api.boards.get,
+    fetchCloudBoard ? { boardId: boardId as Id<"boards"> } : "skip",
+  );
+  const markOpened = useMutation(api.boards.markOpened);
+
+  const cloudBoardId =
+    cloudBoard !== undefined && cloudBoard !== null ? cloudBoard._id : undefined;
+
+  useEffect(() => {
+    if (!fetchCloudBoard || cloudBoardId === undefined) {
+      return;
+    }
+
+    void markOpened({ boardId: cloudBoardId });
+  }, [cloudBoardId, fetchCloudBoard, markOpened]);
+
+  const title = useMemo(() => {
+    const localTitle = boards.find((board) => board.id === boardId)?.title;
+
+    if (fetchCloudBoard) {
+      if (cloudBoard === undefined) {
+        return localTitle ?? fallbackTitle;
+      }
+
+      if (cloudBoard === null) {
+        return localTitle ?? "Board unavailable";
+      }
+
+      return cloudBoard.title;
+    }
+
+    return localTitle ?? fallbackTitle;
+  }, [
+    boards,
+    boardId,
+    cloudBoard,
+    fallbackTitle,
+    fetchCloudBoard,
+  ]);
 
   const addImageFile = useCallback(
     async (file: File) => {
@@ -211,11 +259,15 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
           <div>
             <p className="text-sm font-medium leading-none">{title}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pan and zoom runtime · object rendering next
+              {fetchCloudBoard && cloudBoard === undefined
+                ? "Loading board…"
+                : "Pan, zoom, notes, and images · scenes stay on this device for now"}
             </p>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground">Single-user prototype</div>
+        <div className="text-xs text-muted-foreground">
+          {isSignedIn ? "Signed in" : "Local-only boards"}
+        </div>
       </header>
 
       <section className="isolate relative flex min-h-0 flex-1 overflow-hidden">

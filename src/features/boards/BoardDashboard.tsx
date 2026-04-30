@@ -1,9 +1,11 @@
 "use client";
 
+import { SignInButton, useAuth } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
-import { FormEvent, useState, useSyncExternalStore } from "react";
+import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +26,8 @@ import {
   subscribeLocalBoards,
   updateLocalBoardTitle,
 } from "@/features/boards/local-board-store";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 function formatUpdatedAt(updatedAt: number) {
   return new Intl.DateTimeFormat(undefined, {
@@ -36,38 +40,107 @@ function formatUpdatedAt(updatedAt: number) {
 
 export function BoardDashboard() {
   const router = useRouter();
-  const boards = useSyncExternalStore(
+  const { isLoaded, isSignedIn } = useAuth();
+  const localBoards = useSyncExternalStore(
     subscribeLocalBoards,
     getLocalBoardsSnapshot,
     getServerLocalBoardsSnapshot,
   );
+  const cloudBoards = useQuery(
+    api.boards.list,
+    isLoaded && isSignedIn ? {} : "skip",
+  );
+  const createBoardMutation = useMutation(api.boards.create);
+  const renameBoardMutation = useMutation(api.boards.rename);
+  const archiveBoardMutation = useMutation(api.boards.archive);
+
+  const boards = useMemo((): Board[] | undefined => {
+    if (!isLoaded) {
+      return undefined;
+    }
+
+    if (isSignedIn) {
+      if (cloudBoards === undefined) {
+        return undefined;
+      }
+
+      return cloudBoards.map((board) => ({
+        id: board._id,
+        title: board.title,
+        createdAt: board.createdAt,
+        updatedAt: board.updatedAt,
+      }));
+    }
+
+    return localBoards;
+  }, [cloudBoards, isLoaded, isSignedIn, localBoards]);
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Board | null>(null);
   const [title, setTitle] = useState("");
+  const [pendingAction, setPendingAction] = useState(false);
 
-  function handleCreateBoard(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPendingAction(true);
 
-    const board = createLocalBoard({ title });
-    setTitle("");
-    setCreateDialogOpen(false);
-    router.push(`/boards/${board.id}`);
+    try {
+      if (isSignedIn) {
+        const board = await createBoardMutation({ title });
+        setTitle("");
+        setCreateDialogOpen(false);
+        router.push(`/boards/${board._id}`);
+        return;
+      }
+
+      const board = createLocalBoard({ title });
+      setTitle("");
+      setCreateDialogOpen(false);
+      router.push(`/boards/${board.id}`);
+    } finally {
+      setPendingAction(false);
+    }
   }
 
-  function handleRenameBoard(event: FormEvent<HTMLFormElement>) {
+  async function handleRenameBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!renameTarget) {
       return;
     }
 
-    updateLocalBoardTitle(renameTarget.id, title);
-    setRenameTarget(null);
-    setTitle("");
+    setPendingAction(true);
+
+    try {
+      if (isSignedIn) {
+        await renameBoardMutation({
+          boardId: renameTarget.id as Id<"boards">,
+          title,
+        });
+      } else {
+        updateLocalBoardTitle(renameTarget.id, title);
+      }
+
+      setRenameTarget(null);
+      setTitle("");
+    } finally {
+      setPendingAction(false);
+    }
   }
 
-  function handleDeleteBoard(boardId: string) {
-    deleteLocalBoard(boardId);
+  async function handleArchiveBoard(boardId: string) {
+    setPendingAction(true);
+
+    try {
+      if (isSignedIn) {
+        await archiveBoardMutation({ boardId: boardId as Id<"boards"> });
+        return;
+      }
+
+      deleteLocalBoard(boardId);
+    } finally {
+      setPendingAction(false);
+    }
   }
 
   function openRenameDialog(board: Board) {
@@ -79,7 +152,7 @@ export function BoardDashboard() {
     <>
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section aria-labelledby="recent-boards-heading">
-          <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-3">
             <div>
               <h2
                 id="recent-boards-heading"
@@ -88,17 +161,35 @@ export function BoardDashboard() {
                 Recent boards
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Stored locally for now, with the same boundary Convex will
-                replace later.
+                {isSignedIn
+                  ? "Synced to your account. Open a board to pick up where you left off."
+                  : "Stored on this device until you sign in to sync across browsers."}
               </p>
             </div>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
-              <Plus />
-              New board
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {!isLoaded ? null : isSignedIn ? null : (
+                <SignInButton mode="modal">
+                  <Button variant="secondary" type="button">
+                    Sign in to sync
+                  </Button>
+                </SignInButton>
+              )}
+              <Button
+                variant="outline"
+                disabled={!isLoaded || boards === undefined || pendingAction}
+                onClick={() => setCreateDialogOpen(true)}
+              >
+                <Plus />
+                New board
+              </Button>
+            </div>
           </div>
 
-          {boards.length === 0 ? (
+          {!isLoaded || boards === undefined ? (
+            <div className="py-12 text-sm text-muted-foreground">
+              Loading boards…
+            </div>
+          ) : boards.length === 0 ? (
             <div className="py-12">
               <p className="text-base font-medium tracking-tight">
                 No boards yet.
@@ -107,7 +198,11 @@ export function BoardDashboard() {
                 Create your first workspace for notes, references, and visual
                 planning.
               </p>
-              <Button className="mt-5" onClick={() => setCreateDialogOpen(true)}>
+              <Button
+                className="mt-5"
+                disabled={pendingAction}
+                onClick={() => setCreateDialogOpen(true)}
+              >
                 <Plus />
                 Create board
               </Button>
@@ -132,8 +227,9 @@ export function BoardDashboard() {
                       </span>
                     </div>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                      Local prototype board. Canvas content persistence starts
-                      after the scene model phase.
+                      {isSignedIn
+                        ? "Canvas contents stay in this browser for now; cloud-backed scenes arrive with realtime collaboration."
+                        : "Canvas contents stay on this device until you sign in for cloud-backed boards."}
                     </p>
                   </Link>
                   <div className="flex items-center gap-1">
@@ -147,6 +243,7 @@ export function BoardDashboard() {
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Rename ${board.title}`}
+                      disabled={pendingAction}
                       onClick={() => openRenameDialog(board)}
                     >
                       <Pencil />
@@ -154,8 +251,9 @@ export function BoardDashboard() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Delete ${board.title}`}
-                      onClick={() => handleDeleteBoard(board.id)}
+                      aria-label={`Archive ${board.title}`}
+                      disabled={pendingAction}
+                      onClick={() => void handleArchiveBoard(board.id)}
                     >
                       <Trash2 />
                     </Button>
@@ -168,17 +266,25 @@ export function BoardDashboard() {
 
         <aside className="border-l border-border/70 pl-6">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            Local first
+            {isSignedIn ? "Cloud boards" : "Local boards"}
           </p>
           <div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground">
             <p>
-              These records live in browser storage while we validate the app
-              shell and route boundaries.
+              {isSignedIn
+                ? "Board titles and membership live in Convex. Canvas scenes stay local until the collaboration milestone lands."
+                : "Nothing leaves this browser until you sign in. Use local boards for quick sketches or offline demos."}
             </p>
-            <p>
-              The store is isolated so Convex can become the board source of
-              truth without changing the dashboard UI contract.
-            </p>
+            {!isSignedIn ? (
+              <p>
+                Sign in when you are ready to keep boards with your account and
+                open them on other devices.
+              </p>
+            ) : (
+              <p>
+                Removing a board archives it for your account; invite flows for
+                shared boards arrive in a later milestone.
+              </p>
+            )}
           </div>
         </aside>
       </div>
@@ -200,7 +306,9 @@ export function BoardDashboard() {
               autoFocus
             />
             <DialogFooter className="mt-6">
-              <Button type="submit">Create and open</Button>
+              <Button type="submit" disabled={pendingAction}>
+                Create and open
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -231,7 +339,9 @@ export function BoardDashboard() {
               autoFocus
             />
             <DialogFooter className="mt-6">
-              <Button type="submit">Save name</Button>
+              <Button type="submit" disabled={pendingAction}>
+                Save name
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
