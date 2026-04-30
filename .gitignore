@@ -43,3 +43,15 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+.agents/
+.claude/
+.convex/
+.next/
+.node_modules/
+.out/
+.build/
+.coverage/
+.dist/
+.dist-newstyle/
+.dist-newstyle-*/
+.dist-newstyle-*/
