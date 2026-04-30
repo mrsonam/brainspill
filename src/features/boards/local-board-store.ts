@@ -2,6 +2,7 @@ import type { Board, CreateBoardInput } from "./board-types";
 
 const STORAGE_KEY = "brainspill.boards.v1";
 const STORE_EVENT = "brainspill.boards.changed";
+const SERVER_BOARD_SNAPSHOT: Board[] = [];
 
 let boardSnapshot: Board[] | null = null;
 
@@ -94,7 +95,7 @@ export function getLocalBoardsSnapshot() {
 }
 
 export function getServerLocalBoardsSnapshot() {
-  return [];
+  return SERVER_BOARD_SNAPSHOT;
 }
 
 export function createLocalBoard(input: CreateBoardInput = {}) {

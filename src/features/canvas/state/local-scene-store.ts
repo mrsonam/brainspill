@@ -41,6 +41,7 @@ type CreateImageOptions = CanvasPoint & {
 };
 
 const sceneSnapshots = new Map<string, CanvasScene>();
+const serverSceneSnapshots = new Map<string, CanvasScene>();
 const sceneListeners = new Map<string, Set<SceneListener>>();
 
 function getScene(boardId: string) {
@@ -98,7 +99,16 @@ export function getLocalSceneSnapshot(boardId: string) {
 }
 
 export function getServerLocalSceneSnapshot(boardId: string) {
-  return createEmptyScene(boardId);
+  const scene = serverSceneSnapshots.get(boardId);
+
+  if (scene) {
+    return scene;
+  }
+
+  const emptyScene = createEmptyScene(boardId);
+  serverSceneSnapshots.set(boardId, emptyScene);
+
+  return emptyScene;
 }
 
 export function createLocalStickyNote(
