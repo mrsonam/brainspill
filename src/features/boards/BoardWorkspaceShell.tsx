@@ -8,7 +8,7 @@ import {
   MousePointer2,
   StickyNote,
 } from "lucide-react";
-import { useMemo, useSyncExternalStore } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CanvasViewport } from "@/features/canvas/components/CanvasViewport";
@@ -43,7 +43,43 @@ function titleFromBoardId(boardId: string) {
   return title || "Untitled board";
 }
 
+function imageFileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Could not read image file."));
+    });
+    reader.addEventListener("error", () => {
+      reject(reader.error ?? new Error("Could not read image file."));
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+function readImageDimensions(src: string) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => {
+      resolve({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    });
+    image.addEventListener("error", () => {
+      reject(new Error("Could not load image dimensions."));
+    });
+    image.src = src;
+  });
+}
+
 export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [gridVisible, setGridVisible] = useState(true);
   const fallbackTitle = useMemo(() => titleFromBoardId(boardId), [boardId]);
   const boards = useSyncExternalStore(
     subscribeLocalBoards,
@@ -52,6 +88,39 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
   );
   const title =
     boards.find((board) => board.id === boardId)?.title ?? fallbackTitle;
+
+  async function addImageFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    const src = await imageFileToDataUrl(file);
+    const dimensions = await readImageDimensions(src);
+    const maxWidth = 360;
+    const scale = Math.min(1, maxWidth / dimensions.width);
+
+    createLocalImage(boardId, {
+      x: 360,
+      y: 96,
+      src,
+      fileName: file.name,
+      mimeType: file.type,
+      naturalWidth: dimensions.width,
+      naturalHeight: dimensions.height,
+      width: Math.round(dimensions.width * scale),
+      height: Math.round(dimensions.height * scale),
+    });
+  }
+
+  function handleImageInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      void addImageFile(file);
+    }
+
+    event.target.value = "";
+  }
 
   function handleToolClick(label: string) {
     if (label === "Note") {
@@ -64,21 +133,47 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
     }
 
     if (label === "Image") {
-      createLocalImage(boardId, {
-        x: 360,
-        y: 96,
-        src: `data:image/svg+xml,${encodeURIComponent(
-          `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="36" fill="#f2efe4"/><circle cx="184" cy="152" r="64" fill="#f6c85f"/><path d="M70 335 245 210l104 72 72-49 149 102H70Z" fill="#91b59f"/><text x="64" y="72" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#25221c">Image spill</text></svg>`,
-        )}`,
-        fileName: "image-spill.svg",
-        mimeType: "image/svg+xml",
-        naturalWidth: 640,
-        naturalHeight: 420,
-        width: 320,
-        height: 210,
-      });
+      imageInputRef.current?.click();
+      return;
+    }
+
+    if (label === "Grid") {
+      setGridVisible((visible) => !visible);
     }
   }
+
+  useEffect(() => {
+    function handlePaste(event: ClipboardEvent) {
+      const target = event.target;
+      const isTextInput =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA");
+
+      if (isTextInput) {
+        return;
+      }
+
+      const imageItem = Array.from(event.clipboardData?.items ?? []).find(
+        (item) => item.type.startsWith("image/"),
+      );
+      const file = imageItem?.getAsFile();
+
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+      void addImageFile(file);
+    }
+
+    window.addEventListener("paste", handlePaste);
+
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+    };
+  });
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f5ef] text-foreground">
@@ -113,6 +208,7 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
                 variant={tool.label === "Select" ? "default" : "ghost"}
                 size="icon"
                 aria-label={tool.label}
+                aria-pressed={tool.label === "Grid" ? gridVisible : undefined}
                 onClick={() => handleToolClick(tool.label)}
               >
                 <Icon />
@@ -121,7 +217,15 @@ export function BoardWorkspaceShell({ boardId }: BoardWorkspaceShellProps) {
           })}
         </aside>
 
-        <CanvasViewport boardId={boardId} />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageInputChange}
+        />
+
+        <CanvasViewport boardId={boardId} gridVisible={gridVisible} />
       </section>
     </main>
   );

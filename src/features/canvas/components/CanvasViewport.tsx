@@ -16,9 +16,10 @@ import { useCanvasViewport } from "@/features/canvas/viewport/use-canvas-viewpor
 
 type CanvasViewportProps = {
   boardId: string;
+  gridVisible: boolean;
 };
 
-export function CanvasViewport({ boardId }: CanvasViewportProps) {
+export function CanvasViewport({ boardId, gridVisible }: CanvasViewportProps) {
   const transformRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const scene = useLocalScene(boardId);
@@ -97,7 +98,7 @@ export function CanvasViewport({ boardId }: CanvasViewportProps) {
         zoomAt({ x: event.clientX, y: event.clientY }, event.deltaY);
       }}
     >
-      <GridLayer gridRef={gridRef} />
+      {gridVisible ? <GridLayer gridRef={gridRef} /> : null}
 
       <div
         ref={transformRef}
@@ -106,6 +107,23 @@ export function CanvasViewport({ boardId }: CanvasViewportProps) {
         <div className="absolute left-0 top-0 size-3 rounded-full bg-foreground/70" />
         <CanvasObjectLayer boardId={boardId} viewportRef={viewportRef} />
       </div>
+
+      {scene.objectOrder.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+          <div className="max-w-sm rounded-3xl border border-black/10 bg-background/90 p-6 text-center shadow-sm backdrop-blur">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              Empty spill
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+              Paste an image, write a note, or turn on grid.
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Use the toolbar on the left, paste an image from your clipboard,
+              or drag the surface to start exploring the canvas.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-2xl border border-black/10 bg-background/90 p-2 shadow-sm backdrop-blur">
         <span className="min-w-12 px-2 text-center text-xs font-medium text-muted-foreground">
