@@ -9,7 +9,7 @@ export default defineSchema({
     tokenIdentifier: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_token_identifier", ["tokenIdentifier"]),
+  }).index("by_tokenIdentifier", ["tokenIdentifier"]),
 
   boards: defineTable({
     ownerId: v.id("users"),
@@ -19,8 +19,12 @@ export default defineSchema({
     updatedAt: v.number(),
     lastOpenedAt: v.optional(v.number()),
   })
-    .index("by_owner_updated", ["ownerId", "updatedAt"])
-    .index("by_owner_archived", ["ownerId", "archivedAt"]),
+    .index("by_ownerId_and_updatedAt", ["ownerId", "updatedAt"])
+    .index("by_ownerId_and_archivedAt_and_updatedAt", [
+      "ownerId",
+      "archivedAt",
+      "updatedAt",
+    ]),
 
   boardMembers: defineTable({
     boardId: v.id("boards"),
@@ -28,10 +32,11 @@ export default defineSchema({
     role: v.union(v.literal("owner"), v.literal("editor"), v.literal("viewer")),
     createdAt: v.number(),
     updatedAt: v.number(),
+    lastOpenedAt: v.optional(v.number()),
   })
-    .index("by_board", ["boardId"])
-    .index("by_user", ["userId"])
-    .index("by_board_user", ["boardId", "userId"]),
+    .index("by_boardId", ["boardId"])
+    .index("by_userId", ["userId"])
+    .index("by_boardId_and_userId", ["boardId", "userId"]),
 
   assets: defineTable({
     boardId: v.id("boards"),
@@ -45,8 +50,8 @@ export default defineSchema({
     transparent: v.optional(v.boolean()),
     createdAt: v.number(),
   })
-    .index("by_board", ["boardId"])
-    .index("by_owner", ["ownerId"]),
+    .index("by_boardId", ["boardId"])
+    .index("by_ownerId", ["ownerId"]),
 
   documentSnapshots: defineTable({
     boardId: v.id("boards"),
@@ -56,6 +61,6 @@ export default defineSchema({
     createdBy: v.id("users"),
     createdAt: v.number(),
   })
-    .index("by_board_created", ["boardId", "createdAt"])
-    .index("by_creator", ["createdBy"]),
+    .index("by_boardId_and_createdAt", ["boardId", "createdAt"])
+    .index("by_createdBy", ["createdBy"]),
 });
